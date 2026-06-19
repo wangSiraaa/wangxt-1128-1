@@ -1,11 +1,15 @@
 package com.ad.schedule.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 @TableName("ad_audit_log")
 public class AdAuditLog implements Serializable {
     private static final long serialVersionUID = 1L;

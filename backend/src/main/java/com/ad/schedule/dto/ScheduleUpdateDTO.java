@@ -1,11 +1,15 @@
 package com.ad.schedule.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
-import javax.validation.constraints.NotNull;
+import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class ScheduleUpdateDTO {
     @NotNull(message = "排期ID不能为空")
     private Long id;

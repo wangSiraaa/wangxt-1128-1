@@ -1,8 +1,10 @@
 package com.ad.schedule.common;
 
 import lombok.Getter;
+import lombok.EqualsAndHashCode;
 
 @Getter
+@EqualsAndHashCode(callSuper = true)
 public class BusinessException extends RuntimeException {
     private Integer code;
 

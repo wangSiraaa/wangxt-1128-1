@@ -1,9 +1,13 @@
 package com.ad.schedule.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
-import javax.validation.constraints.NotNull;
+import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.NotNull;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class MaterialAuditDTO {
     @NotNull(message = "素材ID不能为空")
     private Long materialId;
