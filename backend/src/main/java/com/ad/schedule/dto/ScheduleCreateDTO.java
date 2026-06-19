@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -30,6 +31,12 @@ public class ScheduleCreateDTO {
     private Integer duration;
 
     private Integer playOrder;
+
+    private Integer customerPriority;
+
+    private BigDecimal contractAmount;
+
+    private Long replayOfId;
 
     private String remark;
 

@@ -2,17 +2,21 @@ package com.ad.schedule.service.impl;
 
 import com.ad.schedule.common.BusinessException;
 import com.ad.schedule.dto.ScheduleCreateDTO;
+import com.ad.schedule.dto.ScheduleReplayDTO;
 import com.ad.schedule.dto.ScheduleUpdateDTO;
 import com.ad.schedule.entity.AdMaterial;
 import com.ad.schedule.entity.AdSchedule;
 import com.ad.schedule.entity.AdScreen;
 import com.ad.schedule.enums.AuditStatusEnum;
+import com.ad.schedule.enums.ConflictPlanTypeEnum;
 import com.ad.schedule.enums.ProofStatusEnum;
 import com.ad.schedule.enums.ScheduleStatusEnum;
 import com.ad.schedule.mapper.AdMaterialMapper;
 import com.ad.schedule.mapper.AdScheduleMapper;
 import com.ad.schedule.mapper.AdScreenMapper;
+import com.ad.schedule.service.AdMaterialService;
 import com.ad.schedule.service.AdScheduleService;
+import com.ad.schedule.vo.ScheduleConflictVO;
 import com.ad.schedule.vo.ScheduleDetailVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -23,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -40,6 +45,9 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
     @Autowired
     private AdMaterialMapper materialMapper;
 
+    @Autowired
+    private AdMaterialService materialService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AdSchedule createSchedule(ScheduleCreateDTO dto) {
@@ -55,8 +63,10 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
         if (material == null) {
             throw new BusinessException("素材不存在");
         }
-        if (!AuditStatusEnum.PASSED.getCode().equals(material.getAuditStatus())) {
-            throw new BusinessException("素材未通过审核，无法排期");
+
+        boolean passed = materialService.checkMaterialPassedForScreen(dto.getMaterialId(), dto.getScreenId());
+        if (!passed) {
+            throw new BusinessException("素材在该屏幕未通过审核，无法排期");
         }
 
         if (dto.getEndTime().isBefore(dto.getStartTime()) || dto.getEndTime().equals(dto.getStartTime())) {
@@ -67,10 +77,12 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
             throw new BusinessException("播放时长必须大于0");
         }
 
-        boolean hasConflict = checkConflict(dto.getScreenId(), dto.getPlayDate(),
-                dto.getStartTime(), dto.getEndTime(), null);
-        if (hasConflict) {
-            throw new BusinessException("该广告屏在此时段已有排期，请调整时间");
+        ScheduleConflictVO conflictVO = detectConflictWithPlan(
+                dto.getScreenId(), dto.getPlayDate(),
+                dto.getStartTime(), dto.getEndTime(),
+                dto.getCustomerPriority(), dto.getContractAmount(), null);
+        if (conflictVO.isHasConflict()) {
+            throw new BusinessException("该广告屏在此时段已有排期，请查看冲突方案后调整。冲突详情可通过 detect-conflict 接口获取");
         }
 
         AdSchedule schedule = new AdSchedule();
@@ -84,6 +96,9 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
         schedule.setEndTime(dto.getEndTime());
         schedule.setDuration(dto.getDuration());
         schedule.setPlayOrder(dto.getPlayOrder() != null ? dto.getPlayOrder() : 0);
+        schedule.setCustomerPriority(dto.getCustomerPriority() != null ? dto.getCustomerPriority() : 5);
+        schedule.setContractAmount(dto.getContractAmount() != null ? dto.getContractAmount() : BigDecimal.ZERO);
+        schedule.setReplayOfId(dto.getReplayOfId());
         schedule.setRemark(dto.getRemark());
         schedule.setCreateBy(dto.getCreateBy());
         schedule.setScheduleStatus(ScheduleStatusEnum.PENDING.getCode());
@@ -141,9 +156,12 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
                 throw new BusinessException("结束时间必须晚于开始时间");
             }
 
-            boolean hasConflict = checkConflict(screenId, playDate, startTime, endTime, schedule.getId());
-            if (hasConflict) {
-                throw new BusinessException("该广告屏在此时段已有排期，请调整时间");
+            Integer priority = dto.getCustomerPriority() != null ? dto.getCustomerPriority() : schedule.getCustomerPriority();
+            BigDecimal amount = dto.getContractAmount() != null ? dto.getContractAmount() : schedule.getContractAmount();
+            ScheduleConflictVO conflictVO = detectConflictWithPlan(
+                    screenId, playDate, startTime, endTime, priority, amount, schedule.getId());
+            if (conflictVO.isHasConflict()) {
+                throw new BusinessException("该广告屏在此时段已有排期，请查看冲突方案后调整");
             }
         }
 
@@ -152,8 +170,9 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
             if (material == null) {
                 throw new BusinessException("素材不存在");
             }
-            if (!AuditStatusEnum.PASSED.getCode().equals(material.getAuditStatus())) {
-                throw new BusinessException("素材未通过审核，无法排期");
+            boolean passed = materialService.checkMaterialPassedForScreen(materialId, screenId);
+            if (!passed) {
+                throw new BusinessException("素材在该屏幕未通过审核，无法排期");
             }
         }
 
@@ -168,6 +187,8 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
         if (dto.getEndTime() != null) schedule.setEndTime(endTime);
         if (dto.getDuration() != null) schedule.setDuration(dto.getDuration());
         if (dto.getPlayOrder() != null) schedule.setPlayOrder(dto.getPlayOrder());
+        if (dto.getCustomerPriority() != null) schedule.setCustomerPriority(dto.getCustomerPriority());
+        if (dto.getContractAmount() != null) schedule.setContractAmount(dto.getContractAmount());
         if (dto.getRemark() != null) schedule.setRemark(dto.getRemark());
         schedule.setUpdateBy(dto.getUpdateBy());
         this.updateById(schedule);
@@ -196,6 +217,146 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
         schedule.setUpdateBy(operator);
         this.updateById(schedule);
         log.info("排期取消成功, scheduleId: {}", id);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AdSchedule createReplaySchedule(ScheduleReplayDTO dto) {
+        AdSchedule originSchedule = this.getById(dto.getOriginalScheduleId());
+        if (originSchedule == null) {
+            throw new BusinessException("原始排期不存在");
+        }
+
+        Long targetScreenId = dto.getReplayScreenId() != null ? dto.getReplayScreenId() : originSchedule.getScreenId();
+        AdScreen screen = screenMapper.selectById(targetScreenId);
+        if (screen == null || screen.getStatus() != 1) {
+            throw new BusinessException("补播广告屏不存在或未启用");
+        }
+
+        if (dto.getReplayEndTime().isBefore(dto.getReplayStartTime())
+                || dto.getReplayEndTime().equals(dto.getReplayStartTime())) {
+            throw new BusinessException("补播结束时间必须晚于开始时间");
+        }
+
+        boolean hasConflict = checkConflict(targetScreenId, dto.getReplayDate(),
+                dto.getReplayStartTime(), dto.getReplayEndTime(), null);
+        if (hasConflict) {
+            throw new BusinessException("补播时段与现有排期冲突");
+        }
+
+        AdSchedule replaySchedule = new AdSchedule();
+        String replayCode = "RPL" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + String.format("%04d", (int) (Math.random() * 10000));
+        replaySchedule.setScheduleCode(replayCode);
+        replaySchedule.setScreenId(targetScreenId);
+        replaySchedule.setMaterialId(originSchedule.getMaterialId());
+        replaySchedule.setPlayDate(dto.getReplayDate());
+        replaySchedule.setStartTime(dto.getReplayStartTime());
+        replaySchedule.setEndTime(dto.getReplayEndTime());
+        replaySchedule.setDuration(originSchedule.getDuration());
+        replaySchedule.setCustomerPriority(originSchedule.getCustomerPriority());
+        replaySchedule.setContractAmount(originSchedule.getContractAmount());
+        replaySchedule.setReplayOfId(dto.getOriginalScheduleId());
+        replaySchedule.setRemark("补播排期，来源:" + originSchedule.getScheduleCode()
+                + (dto.getReplayRemark() != null ? " | " + dto.getReplayRemark() : ""));
+        replaySchedule.setCreateBy(dto.getCreateBy());
+        replaySchedule.setScheduleStatus(ScheduleStatusEnum.PENDING_REPLAY.getCode());
+        replaySchedule.setProofStatus(ProofStatusEnum.NOT_SUBMITTED.getCode());
+        this.save(replaySchedule);
+
+        if (!ScheduleStatusEnum.PENDING_REPLAY.getCode().equals(originSchedule.getScheduleStatus())) {
+            originSchedule.setScheduleStatus(ScheduleStatusEnum.PENDING_REPLAY.getCode());
+            this.updateById(originSchedule);
+        }
+
+        log.info("补播排期创建成功, 原始排期: {}, 补播排期: {}", dto.getOriginalScheduleId(), replayCode);
+        return replaySchedule;
+    }
+
+    @Override
+    public ScheduleConflictVO detectConflictWithPlan(Long screenId, LocalDate playDate,
+                                                      LocalTime startTime, LocalTime endTime,
+                                                      Integer customerPriority, BigDecimal contractAmount,
+                                                      Long excludeId) {
+        ScheduleConflictVO vo = new ScheduleConflictVO();
+        List<AdSchedule> conflicting = baseMapper.findConflictingSchedules(
+                screenId, playDate, startTime, endTime, excludeId == null ? -1L : excludeId);
+
+        if (conflicting == null || conflicting.isEmpty()) {
+            vo.setHasConflict(false);
+            vo.setConflictList(new ArrayList<>());
+            return vo;
+        }
+
+        vo.setHasConflict(true);
+        List<ScheduleConflictVO.ConflictDetail> detailList = new ArrayList<>();
+        Integer newPriority = customerPriority != null ? customerPriority : 5;
+        BigDecimal newAmount = contractAmount != null ? contractAmount : BigDecimal.ZERO;
+
+        for (AdSchedule exist : conflicting) {
+            ScheduleConflictVO.ConflictDetail detail = new ScheduleConflictVO.ConflictDetail();
+            detail.setExistingSchedule(exist);
+
+            AdMaterial material = materialMapper.selectById(exist.getMaterialId());
+            if (material != null) {
+                detail.setExistingCustomerName(material.getCustomerName());
+            }
+            detail.setExistingCustomerPriority(exist.getCustomerPriority() != null ? exist.getCustomerPriority() : 5);
+            detail.setExistingContractAmount(exist.getContractAmount() != null ? exist.getContractAmount() : BigDecimal.ZERO);
+
+            Integer existPriority = detail.getExistingCustomerPriority();
+            if (newPriority > existPriority) {
+                detail.setPriorityCompare("higher");
+            } else if (newPriority < existPriority) {
+                detail.setPriorityCompare("lower");
+            } else {
+                detail.setPriorityCompare("equal");
+            }
+
+            BigDecimal existAmount = detail.getExistingContractAmount();
+            int amountCmp = newAmount.compareTo(existAmount);
+            if (amountCmp > 0) {
+                detail.setAmountCompare("higher");
+            } else if (amountCmp < 0) {
+                detail.setAmountCompare("lower");
+            } else {
+                detail.setAmountCompare("equal");
+            }
+
+            List<ScheduleConflictVO.ReplayPlan> planList = new ArrayList<>();
+
+            ScheduleConflictVO.ReplayPlan plan1 = new ScheduleConflictVO.ReplayPlan();
+            plan1.setPlanType(ConflictPlanTypeEnum.EXISTING_FIRST.getCode());
+            plan1.setPlanTypeDesc(ConflictPlanTypeEnum.EXISTING_FIRST.getDesc());
+            plan1.setDescription("保留现有排期，建议为新排期另行安排时段");
+            planList.add(plan1);
+
+            ScheduleConflictVO.ReplayPlan plan2 = new ScheduleConflictVO.ReplayPlan();
+            plan2.setPlanType(ConflictPlanTypeEnum.NEW_FIRST.getCode());
+            plan2.setPlanTypeDesc(ConflictPlanTypeEnum.NEW_FIRST.getDesc());
+            plan2.setDescription("新排期优先（需客户优先级或合同金额更高），现有排期需改期");
+            planList.add(plan2);
+
+            ScheduleConflictVO.ReplayPlan plan3 = new ScheduleConflictVO.ReplayPlan();
+            plan3.setPlanType(ConflictPlanTypeEnum.SPLIT_TIME.getCode());
+            plan3.setPlanTypeDesc(ConflictPlanTypeEnum.SPLIT_TIME.getDesc());
+            plan3.setDescription("拆分时段，双方各占用部分时间");
+            planList.add(plan3);
+
+            ScheduleConflictVO.ReplayPlan plan4 = new ScheduleConflictVO.ReplayPlan();
+            plan4.setPlanType(ConflictPlanTypeEnum.RECOMMEND_REPLAY.getCode());
+            plan4.setPlanTypeDesc(ConflictPlanTypeEnum.RECOMMEND_REPLAY.getDesc());
+            plan4.setRecommendedDate(playDate.plusDays(1));
+            plan4.setRecommendedTime(startTime.toString() + " - " + endTime.toString());
+            plan4.setDescription("推荐次日同时段作为补播时间");
+            planList.add(plan4);
+
+            detail.setReplayPlans(planList);
+            detailList.add(detail);
+        }
+
+        vo.setConflictList(detailList);
+        return vo;
     }
 
     @Override
@@ -252,6 +413,19 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
     }
 
     @Override
+    public List<ScheduleDetailVO> listReplayByOriginId(Long originScheduleId) {
+        LambdaQueryWrapper<AdSchedule> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(AdSchedule::getReplayOfId, originScheduleId)
+                .orderByDesc(AdSchedule::getCreateTime);
+        List<AdSchedule> scheduleList = this.list(wrapper);
+        List<ScheduleDetailVO> voList = new ArrayList<>();
+        for (AdSchedule s : scheduleList) {
+            voList.add(buildDetailVO(s));
+        }
+        return voList;
+    }
+
+    @Override
     public boolean checkConflict(Long screenId, LocalDate playDate,
                                  LocalTime startTime, LocalTime endTime,
                                  Long excludeId) {
@@ -267,6 +441,7 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
         if (screen != null) {
             vo.setScreenName(screen.getScreenName());
             vo.setScreenCode(screen.getScreenCode());
+            vo.setBusinessDistrict(screen.getBusinessDistrict());
         }
         AdMaterial material = materialMapper.selectById(schedule.getMaterialId());
         if (material != null) {
@@ -277,6 +452,9 @@ public class AdScheduleServiceImpl extends ServiceImpl<AdScheduleMapper, AdSched
             vo.setFileUrl(material.getFileUrl());
             vo.setAuditStatus(material.getAuditStatus());
         }
+        vo.setContractAmount(schedule.getContractAmount());
+        vo.setCustomerPriority(schedule.getCustomerPriority());
+        vo.setReplayOfId(schedule.getReplayOfId());
         return vo;
     }
 }

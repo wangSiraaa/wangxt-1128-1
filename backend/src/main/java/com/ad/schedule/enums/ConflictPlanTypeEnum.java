@@ -5,18 +5,17 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum ScheduleStatusEnum {
-    PENDING(1, "待刊播"),
-    PLAYING(2, "刊播中"),
-    FINISHED(3, "已完成"),
-    CANCELLED(4, "已取消"),
-    PENDING_REPLAY(5, "待补播");
+public enum ConflictPlanTypeEnum {
+    EXISTING_FIRST(1, "原排期优先"),
+    NEW_FIRST(2, "新排期优先"),
+    SPLIT_TIME(3, "拆分时段"),
+    RECOMMEND_REPLAY(4, "推荐补播");
 
     private final Integer code;
     private final String desc;
 
-    public static ScheduleStatusEnum getByCode(Integer code) {
-        for (ScheduleStatusEnum e : values()) {
+    public static ConflictPlanTypeEnum getByCode(Integer code) {
+        for (ConflictPlanTypeEnum e : values()) {
             if (e.getCode().equals(code)) {
                 return e;
             }

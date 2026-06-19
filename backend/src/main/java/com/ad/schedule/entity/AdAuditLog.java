@@ -20,6 +20,9 @@ public class AdAuditLog implements Serializable {
     @TableField("material_id")
     private Long materialId;
 
+    @TableField("screen_id")
+    private Long screenId;
+
     @TableField("audit_status")
     private Integer auditStatus;
 

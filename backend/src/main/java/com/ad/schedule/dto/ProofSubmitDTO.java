@@ -29,6 +29,12 @@ public class ProofSubmitDTO {
 
     private Integer actualDuration;
 
+    private String watermarkSn;
+
+    private Integer replayType;
+
+    private String replayRemark;
+
     private String remark;
 
     @NotNull(message = "回传人不能为空")

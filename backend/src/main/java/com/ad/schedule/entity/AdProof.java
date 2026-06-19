@@ -50,6 +50,30 @@ public class AdProof implements Serializable {
     @TableField("actual_duration")
     private Integer actualDuration;
 
+    @TableField("watermark_sn")
+    private String watermarkSn;
+
+    @TableField("screen_code_snapshot")
+    private String screenCodeSnapshot;
+
+    @TableField("duration_snapshot")
+    private Integer durationSnapshot;
+
+    @TableField("is_locked")
+    private Integer isLocked;
+
+    @TableField("lock_time")
+    private LocalDateTime lockTime;
+
+    @TableField("locked_by")
+    private String lockedBy;
+
+    @TableField("replay_type")
+    private Integer replayType;
+
+    @TableField("replay_remark")
+    private String replayRemark;
+
     @TableField("remark")
     private String remark;
 

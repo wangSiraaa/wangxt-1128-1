@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -43,11 +44,20 @@ public class AdSchedule implements Serializable {
     @TableField("play_order")
     private Integer playOrder;
 
+    @TableField("customer_priority")
+    private Integer customerPriority;
+
+    @TableField("contract_amount")
+    private BigDecimal contractAmount;
+
     @TableField("schedule_status")
     private Integer scheduleStatus;
 
     @TableField("proof_status")
     private Integer proofStatus;
+
+    @TableField("replay_of_id")
+    private Long replayOfId;
 
     @TableField("remark")
     private String remark;

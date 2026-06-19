@@ -2,9 +2,11 @@ package com.ad.schedule.controller;
 
 import com.ad.schedule.common.Result;
 import com.ad.schedule.dto.ScheduleCreateDTO;
+import com.ad.schedule.dto.ScheduleReplayDTO;
 import com.ad.schedule.dto.ScheduleUpdateDTO;
 import com.ad.schedule.entity.AdSchedule;
 import com.ad.schedule.service.AdScheduleService;
+import com.ad.schedule.vo.ScheduleConflictVO;
 import com.ad.schedule.vo.ScheduleDetailVO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +14,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -39,6 +42,25 @@ public class AdScheduleController {
         return Result.success();
     }
 
+    @PostMapping("/replay")
+    public Result<AdSchedule> createReplay(@Validated @RequestBody ScheduleReplayDTO dto) {
+        return Result.success(scheduleService.createReplaySchedule(dto));
+    }
+
+    @GetMapping("/detect-conflict")
+    public Result<ScheduleConflictVO> detectConflict(
+            @RequestParam Long screenId,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate playDate,
+            @RequestParam @DateTimeFormat(pattern = "HH:mm:ss") LocalTime startTime,
+            @RequestParam @DateTimeFormat(pattern = "HH:mm:ss") LocalTime endTime,
+            @RequestParam(required = false, defaultValue = "5") Integer customerPriority,
+            @RequestParam(required = false, defaultValue = "0") BigDecimal contractAmount,
+            @RequestParam(required = false) Long excludeId) {
+        return Result.success(scheduleService.detectConflictWithPlan(
+                screenId, playDate, startTime, endTime,
+                customerPriority, contractAmount, excludeId));
+    }
+
     @GetMapping("/page")
     public Result<Page<ScheduleDetailVO>> page(@RequestParam(defaultValue = "1") Integer pageNum,
                                                @RequestParam(defaultValue = "10") Integer pageSize,
@@ -59,6 +81,11 @@ public class AdScheduleController {
     public Result<List<AdSchedule>> listByScreenAndDate(@RequestParam Long screenId,
                                                         @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate playDate) {
         return Result.success(scheduleService.listByScreenAndDate(screenId, playDate));
+    }
+
+    @GetMapping("/replay-list/{originScheduleId}")
+    public Result<List<ScheduleDetailVO>> listReplayByOriginId(@PathVariable Long originScheduleId) {
+        return Result.success(scheduleService.listReplayByOriginId(originScheduleId));
     }
 
     @GetMapping("/check-conflict")

@@ -2,9 +2,11 @@ package com.ad.schedule.controller;
 
 import com.ad.schedule.common.Result;
 import com.ad.schedule.dto.MaterialAuditDTO;
+import com.ad.schedule.dto.MaterialScreenAuditDTO;
 import com.ad.schedule.dto.MaterialSubmitDTO;
 import com.ad.schedule.entity.AdMaterial;
 import com.ad.schedule.service.AdMaterialService;
+import com.ad.schedule.vo.MaterialScreenAuditVO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
@@ -27,6 +29,22 @@ public class AdMaterialController {
     @PostMapping("/audit")
     public Result<AdMaterial> audit(@Validated @RequestBody MaterialAuditDTO dto) {
         return Result.success(materialService.auditMaterial(dto));
+    }
+
+    @PostMapping("/audit-by-screen")
+    public Result<MaterialScreenAuditVO> auditByScreen(@Validated @RequestBody MaterialScreenAuditDTO dto) {
+        return Result.success(materialService.auditMaterialByScreen(dto));
+    }
+
+    @GetMapping("/screen-audit/{materialId}")
+    public Result<MaterialScreenAuditVO> getScreenAudit(@PathVariable Long materialId) {
+        return Result.success(materialService.getMaterialScreenAudit(materialId));
+    }
+
+    @GetMapping("/check-screen-pass")
+    public Result<Boolean> checkScreenPass(@RequestParam Long materialId,
+                                           @RequestParam Long screenId) {
+        return Result.success(materialService.checkMaterialPassedForScreen(materialId, screenId));
     }
 
     @GetMapping("/list-audited")

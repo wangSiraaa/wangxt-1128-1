@@ -10,45 +10,42 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("ad_screen")
-public class AdScreen implements Serializable {
+@TableName("ad_material_screen_audit")
+public class AdMaterialScreenAudit implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    @TableField("screen_code")
-    private String screenCode;
+    @TableField("material_id")
+    private Long materialId;
 
-    @TableField("screen_name")
-    private String screenName;
+    @TableField("screen_id")
+    private Long screenId;
 
     @TableField("business_district")
     private String businessDistrict;
 
-    @TableField("location")
-    private String location;
+    @TableField("audit_status")
+    private Integer auditStatus;
 
-    @TableField("resolution")
-    private String resolution;
+    @TableField("audit_remark")
+    private String auditRemark;
 
-    @TableField("status")
-    private Integer status;
+    @TableField("compliance_rule")
+    private String complianceRule;
 
-    @TableField("description")
-    private String description;
+    @TableField("audit_time")
+    private LocalDateTime auditTime;
+
+    @TableField("auditor")
+    private String auditor;
 
     @TableField(value = "create_time", fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
     @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
-
-    @TableField("create_by")
-    private String createBy;
-
-    @TableField("update_by")
-    private String updateBy;
 
     @TableLogic
     @TableField("deleted")
